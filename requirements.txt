@@ -1,0 +1,21 @@
+# Requires Python 3.12.
+--extra-index-url https://download.pytorch.org/whl/cu126
+
+pip>=24
+numpy>=1.26,<2.0
+scipy>=1.12
+nibabel>=5.0
+matplotlib>=3.8
+PyYAML>=6.0.2
+Pillow>=10
+scikit-image>=0.22
+scikit-learn>=1.4
+SimpleITK>=2.3
+tqdm>=4.66
+torch>=2.4.1
+torchvision>=0.19
+monai>=1.5.1,<1.6
+einops>=0.7
+medpy>=0.5
+thop>=0.1.1.post2209072238
+segmentation-models-pytorch>=0.3.4

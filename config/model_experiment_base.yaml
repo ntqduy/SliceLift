@@ -1,0 +1,198 @@
+project:
+  name: cyst_proposal_model_experiment
+
+seed: 42
+
+dataset:
+  name: cyst
+  root: data
+  train_list: train_new.txt
+  val_list: val_new.txt
+  all_train_list: all_train.txt
+  test_list: test.txt
+  image_key: image_path
+  mask_key: mask_path
+  num_classes: 2
+  binarize_masks: true
+  intensity_normalization: foreground_zscore
+
+experiment:
+  name: Proposal_Model_Experiment
+  stage: hybrid  # train_2d | train_3d | hybrid
+
+# Proposal output root. Runner derives 1_2D_pretrain, 2_3D_pretrain,
+# and 3_hybrid subfolders from this single root.
+paths:
+  output_root: outputs/Proposal_Model_Experiment
+
+pretrain:
+  auto_train_missing_pretrain: false
+  stage1_2d_ckpt: auto
+  stage2_3d_ckpt: auto
+  stage2_3d_decoder_ckpt: auto
+  load_2d_encoder_from_stage1: true
+  load_3d_encoder_from_stage2: true
+  load_3d_decoder_from_stage2: true
+  strict: false
+  freeze_2d_encoder: false
+  freeze_3d_encoder: false
+  freeze_3d_decoder: false
+
+model:
+  name: proposal_model_experiment
+  type: 3D
+  backbone: proposal_experiment_hybrid_encoder
+  in_channels: 1
+  num_classes: 2
+  base_channels: 16
+
+  # Stage 1 2D model: decoder is auto-derived from this encoder.
+  #   unet/nnunet -> same_scale, unetpp -> nested_dense, unet3plus -> full_scale
+  encoder_2d:
+    type: unet3plus
+    channels: [16, 32, 64, 128, 256]
+
+  # 3D encoder: unet3d | unetpp3d | unet3plus3d | nnunet3d
+  encoder_3d:
+    type: unet3plus3d 
+    channels: [16, 32, 64, 128, 256]
+
+  # Stage 2 3D decoder.
+  # model: auto | unet3d | unetpp3d | unet3plus3d | nnunet3d
+  # style: auto | same_scale(skip/U-Net) | nested_dense(UNet++) | full_scale(UNet3+)
+  #      | full_encoder_single_decoder | single_encoder_full_decoder
+  # Recommended pairs:
+  #   unet3d/nnunet3d -> same_scale
+  #   unetpp3d       -> nested_dense
+  #   unet3plus3d    -> full_scale
+  decoder_3d:
+    model: unet3plus3d 
+    style: full_scale
+    deep_supervision: false
+
+  # Stage 3 hybrid 3D decoder.
+  # model: unet3d | unetpp3d | unet3plus3d | nnunet3d
+  # style: same_scale(skip/U-Net) | nested_dense(UNet++) | full_scale(UNet3+)
+  #      | full_encoder_single_decoder | single_encoder_full_decoder
+  # Recommended pairs:
+  #   unet3d/nnunet3d -> same_scale
+  #   unetpp3d       -> nested_dense
+  #   unet3plus3d    -> full_scale
+  # Its pretrained weights are resolved independently from a matching Stage 2
+  # run when pretrain.stage2_3d_decoder_ckpt is auto.
+  decoder:
+    model: unet3plus3d 
+    style: full_scale
+    deep_supervision: false
+
+  # Slice selection: group-based | middle | uniform | random
+  slice_selection:
+    mode: group-based
+    # For group-based mode this is resolved from num_groups * samples_per_group.
+    # It is kept here as a readable default and for non-group-based modes.
+    num_slices: 15
+    seed: 42
+    group_based:
+      num_groups: 15
+      samples_per_group: 1
+      similarity_metric: mad
+      # different: choose the slice farthest from its group mean.
+      # closest: legacy behavior, choose the slice most similar to its group mean.
+      selection_order: different
+
+  # Encoder fusion: add | concat
+  fusion:
+    type: add
+
+  args:
+    __replace__: true
+  args_2d:
+    __replace__: true
+  args_3d:
+    __replace__: true
+
+
+slice_2d:
+  axis: 2
+
+training:
+  epochs: 60
+  batch_size: 8
+  batch_size_3d: 4
+  # Hybrid keeps raw depth for slice selection; runner uses this batch size
+  # there because raw depth can vary across cases.
+  raw_depth_batch_size_3d: 1
+  lr: 0.0005
+  optimizer: adamw
+  weight_decay: 0.0001
+  momentum: 0.9
+  scheduler: cosine
+  min_lr: 0.000001
+  loss: ce_dice
+  image_size: [256, 256, 64]
+  volume_layout: DHW
+  # DataLoader workers per fold/process. Effective loader processes are roughly
+  # k_fold.max_parallel_folds * num_workers when k_fold.run_parallel=true.
+  num_workers: 4
+  pin_memory: true
+  persistent_workers: true
+  prefetch_factor: 2
+  deterministic: true
+  show_progress: true
+  amp: false
+  save_best_by: val_dice
+
+augmentation:
+  enabled: true
+
+early_stopping:
+  enabled: true
+  patience: 20
+  min_delta: 0.0001
+
+k_fold:
+  enabled: true
+  # Splits are saved/reused under:
+  # data/data_fold/<source>__<test>__k<num_folds>__seed<seed>__<shuffle>/
+  num_folds: 3
+  shuffle: true
+  seed: 42
+  source_list: all_train.txt
+  run_parallel: true
+  max_parallel_folds: 3
+  parallel_single_gpu_per_fold: true
+  parallel_gpu_ids: auto
+
+gpu:
+  use_cuda: true
+  ids: "0, 1, 2"
+  multi_gpu: true
+
+evaluation:
+  evaluate_2d_as_volume: true
+  batch_size: 1
+  batch_size_3d: 1
+  slice_batch_size: 8
+  compute_surface_metrics: true
+  compute_flops: true
+  fail_on_flops_error: false
+  save_predictions_per_split: 7
+
+visualization:
+  seed: 42
+  selection: per_source
+  samples_per_source: 1
+  save_per_source: true
+  save_diagnostics: true
+  save_summary_pdf: true
+  summary_pdf_name: image_ground_truth_predict.pdf
+  summary_pdf_rows_per_page: 4
+  # Axis in source volume coordinates. For 3D tensors with training.volume_layout: DHW,
+  # visualization maps source depth axis 2 to tensor axis 0 before saving PNG/PDF slices.
+  slice_axis: 2
+  slice_axis_layout: source
+  slice_position: label_foreground
+  gradcam_depth_window: 16
+  gradcam_slice_only: true
+  fail_on_gradcam_error: false
+  max_diagnostic_stages: 5

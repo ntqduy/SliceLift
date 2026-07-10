@@ -1,0 +1,6 @@
+data/
+__pycache__/
+analysis_data/__pycache__/
+wheels_seg/
+pretrain/
+outputs/

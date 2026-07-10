@@ -1,0 +1,17 @@
+extends: model_experiment_hybrid.yaml
+
+pretrain:
+  stage2_3d_ckpt: null
+  stage2_3d_decoder_ckpt: null
+  load_3d_encoder_from_stage2: false
+  load_3d_decoder_from_stage2: false
+
+stage3_hybrid:
+  load_pretrained_3d_encoder: false
+  load_pretrained_3d_decoder: false
+
+model:
+  decoder:
+    model: unet3plus3d
+    style: single_encoder_full_decoder
+    deep_supervision: false

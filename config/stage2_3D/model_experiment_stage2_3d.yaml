@@ -1,0 +1,8 @@
+extends: ../model_experiment_base.yaml
+
+experiment:
+  stage: train_3d
+
+model:
+  type: 3D
+  backbone: proposal_experiment_3d_encoder

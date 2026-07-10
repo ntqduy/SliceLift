@@ -1,0 +1,15 @@
+from __future__ import annotations
+
+from .hybrid_base import ExperimentHybridModel
+
+
+class HybridNNUNet3DNNUNet2D(ExperimentHybridModel):
+    """Hybrid architecture: nnUNet3D encoder + nnUNet2D encoder."""
+
+    def __init__(self, *args, **kwargs):
+        kwargs.setdefault("encoder_3d_type", "nnunet3d")
+        kwargs.setdefault("encoder_2d_type", "nnunet")
+        super().__init__(*args, **kwargs)
+
+
+__all__ = ["HybridNNUNet3DNNUNet2D"]
